@@ -326,4 +326,4 @@ def line_plt(ls: list, ylabel, name):
 
 def log_clear():
     with open(os.path.join(filepath, 'log.txt'), 'w') as f_log:
-        logging('cleared.')
+        print('cleared.')
