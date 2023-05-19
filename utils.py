@@ -27,7 +27,8 @@ def logging(s, print_=True, log_=True):
             f_log.write(s + '\n')
 
                    
-def evaluate(data: torch.Tensor, batch_size=10, criterion=None):
+def evaluate(model, data: torch.Tensor, batch_size=10, criterion=None,
+             y_label = True):
     model.eval()
     total_loss = 0
     avg_loss = []
@@ -38,8 +39,14 @@ def evaluate(data: torch.Tensor, batch_size=10, criterion=None):
     
     with torch.no_grad():
         for x, y in val_iter:
-            # x_torch = torch.from_numpy(x)
-            # y_torch = torch.from_numpy(y)
+            x_torch = torch.from_numpy(x)
+            y_torch = torch.from_numpy(y)
+            
+            if y_label:
+                y_torch_n = torch.zeros(pred.shape)
+                for i in range(y_torch_n.shape[0]):
+                    y_torch_n[i][y_torch[i]] = 1
+                y_torch = y_torch_n
                    
             pred = model(x_torch)
             loss = criterion(pred, y_torch)
@@ -49,8 +56,16 @@ def evaluate(data: torch.Tensor, batch_size=10, criterion=None):
     return total_loss.item() / data.shape[0], avg_loss
                    
 
-def train(model, data, criterion=None, optimizer=None, batch_size=10, epoches=10, lr=0.01, print_format='normal',
-          loss_appendix=False, graph=True):
+def train(model, # nn.Modules derived manual ML model
+          data, # [X, y]
+          criterion=None, optimizer=None, batch_size=10, epoches=10, lr=0.01, print_format='normal',
+          loss_appendix=False, # if add para_cal to loss
+          graph=True, 
+          y_label=True, # if y is label or one-hot coding
+          model_desp=False, # if model has .inode / .onode / .hnode_stringformat attrs
+          val=False,
+          val_data=None
+          ):
     total_loss = 0
     avg_loss = []
     if criterion == None:
@@ -61,13 +76,28 @@ def train(model, data, criterion=None, optimizer=None, batch_size=10, epoches=10
     train_iter = get_batch_data(data[0], data[1], batch_size)
     # train_iter = np.array(train_iter, dtype = np.float32)
     
+    if val:
+        total_loss_val = 0
+        avg_loss_val = []
+        val_iter = get_batch_data(val_data[0], val_data[1], batch_size)
+        val_iter = torch.tensor(val_iter)
+    
     for epoch in range(epoches):
         for batch, (x, y) in enumerate(train_iter):
             optimizer.zero_grad()
-            x_torch = torch.from_numpy(x).to(torch.float32)
-            y_torch = torch.from_numpy(y).to(torch.float32)
-
+            x_torch = torch.from_numpy(x).to(torch.float32).requires_grad_()
+            if y_label:
+                y_torch = torch.from_numpy(y).to(torch.long)
+            else:
+                y_torch = torch.from_numpy(y).to(torch.float32)
+            
             pred = model(x_torch)
+            # pred = torch.argmax(model(x_torch), dim=1)
+            if y_label:
+                y_torch_n = torch.zeros(pred.shape)
+                for i in range(y_torch_n.shape[0]):
+                    y_torch_n[i][y_torch[i]] = 1
+                y_torch = y_torch_n
             loss = criterion(pred, y_torch)
             if loss_appendix:
                 pass
@@ -88,18 +118,61 @@ def train(model, data, criterion=None, optimizer=None, batch_size=10, epoches=10
                     epoch, batch, len(train_iter), optimizer.param_groups[0]['lr'],
                     loss, torch.exp(loss)))
                 
-    name = 'I:{:3d}, H:{}, O:{:3d}, lr:{:02.2f}, epoch:{:5d}'.format(
+            if val:
+                model.eval()
+                with torch.no_grad():
+                        x_torch = torch.from_numpy(val_iter[0][batch]).to(torch.float32).requires_grad_()
+                        if y_label:
+                            y_torch = torch.from_numpy(val_iter[1][batch]).to(torch.long)
+                        else:
+                            y_torch = torch.from_numpy(val_iter[1][batch]).to(torch.float32)
+                        
+                        pred = model(x_torch)
+                        # pred = torch.argmax(model(x_torch), dim=1)
+                        if y_label:
+                            y_torch_n = torch.zeros(pred.shape)
+                            for i in range(y_torch_n.shape[0]):
+                                y_torch_n[i][y_torch[i]] = 1
+                            y_torch = y_torch_n
+                        loss = criterion(pred, y_torch)
+                        if loss_appendix:
+                            pass
+                        # loss.backward()
+                        # optimizer.step()
+
+                        total_loss_val += loss*x.shape[0]
+                        avg_loss_val.append(loss)
+                            
+                        if print_format == 'time':
+                            logging('val: | epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
+                                    'loss {:5.2f} | ppl {:8.2f}'.format(
+                                epoch, batch, len(train_iter), optimizer.param_groups[0]['lr'],
+                                elapsed * 1000 / x.size(0), loss, torch.exp(loss)))
+                        else:
+                            logging('val: | epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | '
+                                    'loss {:5.2f} | ppl {:8.2f}'.format(
+                                epoch, batch, len(train_iter), optimizer.param_groups[0]['lr'],
+                                loss, torch.exp(loss)))
+                
+    if model_desp:
+        name = 'I:{:3d}, H:{}, O:{:3d}, lr:{:02.2f}, epoch:{:5d}'.format(
             model.inode, model.hnode_stringformat, model.onode, optimizer.param_groups[0]['lr'], epoches)
+    else:
+        name = 'model0'
                 
     if graph:
         my_plt(avg_loss, 'loss', name)
         my_plt(avg_loss, 'loss_mean', name, mean=True)
+        if val:
+            my_plt(avg_loss_val, 'val_loss', name)
+            my_plt(avg_loss_val, 'val_loss_mean', name, mean=True)
         
     logging('\n' + str(summary(model)))
     logging('\n' + str(model))
-        
+    
+    if val:
+        return (total_loss, avg_loss) , (total_loss_val, avg_loss_val)
     return total_loss, avg_loss
-        
 
 import matplotlib.pyplot as plt
 def my_plt(ls: list, ylabel, name, line=True, mean=False):
