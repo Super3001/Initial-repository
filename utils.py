@@ -2,8 +2,9 @@
 import torch
 from torch import nn
 import numpy as np
-import datetime
+import time
 from torchsummary import summary
+import os
 
 def get_batch_data(x_data, y_data, batch_size) -> list:
     assert len(x_data) == len(y_data), "size doesn't match"
@@ -66,8 +67,9 @@ def train(model, # nn.Modules derived manual ML model
           val=False,
           val_data=None
           ):
-    total_loss = 0
-    avg_loss = []
+    total_loss = 0 # loss per epoch
+    avg_loss = [] # loss per batch
+    
     if criterion == None:
         criterion = nn.MSELoss()
     if optimizer == None:
@@ -77,13 +79,15 @@ def train(model, # nn.Modules derived manual ML model
     # train_iter = np.array(train_iter, dtype = np.float32)
     
     if val:
-        total_loss_val = 0
-        avg_loss_val = []
+        total_loss_val = 0 # loss per epoch
+        loss_val = [] # loss per idx
         val_iter = get_batch_data(val_data[0], val_data[1], 1)
         val_iter = torch.tensor(val_iter)
     
     for epoch in range(epoches):
+        total_loss = 0
         for batch, (x, y) in enumerate(train_iter):
+            start = time.time()
             optimizer.zero_grad()
             x_torch = torch.from_numpy(x).to(torch.float32).requires_grad_()
             if y_label:
@@ -106,7 +110,8 @@ def train(model, # nn.Modules derived manual ML model
 
             total_loss += loss*x.shape[0]
             avg_loss.append(loss)
-                   
+            elapsed = time.time() - start
+            
             if print_format == 'time':
                 logging('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
                         'loss {:5.2f} | ppl {:8.2f}'.format(
@@ -121,7 +126,7 @@ def train(model, # nn.Modules derived manual ML model
         if val:
             model.eval()
             with torch.no_grad():
-                avg_loss_val.append(0)
+                start_val = time.time()
                 for x, y in val_iter:
                     x_torch = torch.from_numpy(x).to(torch.float32)
                     if y_label:
@@ -142,11 +147,12 @@ def train(model, # nn.Modules derived manual ML model
                     # loss.backward()
                     # optimizer.step()
 
-                    total_loss_val += loss*x.shape[0]
-                    avg_loss_val[-1] += loss
+                    total_loss_val += loss
+                    loss_val.append(loss)
                         
                 # 计算每一个epoch的平均val_loss
-                loss = avg_loss_val[-1] / len(val_data)
+                loss = total_loss_val / len(val_iter)
+                elapsed = time.time() - start_val
                 if print_format == 'time':
                     logging('val: | epoch {:3d} | lr {:02.2f} | ms/batch {:5.2f} | '
                             'loss {:5.2f} | ppl {:8.2f}'.format(
@@ -168,20 +174,20 @@ def train(model, # nn.Modules derived manual ML model
         my_plt(avg_loss, 'loss', name)
         my_plt(avg_loss, 'loss_mean', name, mean=True)
         if val:
-            my_plt(avg_loss_val, 'val_loss', name)
-            my_plt(avg_loss_val, 'val_loss_mean', name, mean=True)
+            my_plt(loss_val, 'val_loss', name)
+            my_plt(loss_val, 'val_loss_mean', name, mean=True)
         
     logging('\n' + str(summary(model)))
     logging('\n' + str(model))
     
     if val:
-        return (total_loss, avg_loss) , (total_loss_val, avg_loss_val)
+        return (total_loss, avg_loss) , (total_loss_val, loss_val)
     return total_loss, avg_loss
 
 """using Dataloader"""
 def train_1(model, # nn.Modules derived manual ML model
-          loader, # [X, y]
-          criterion=None, optimizer=None, batch_size=10, epoches=10, lr=0.01, print_format='normal',
+          loader,
+          criterion=None, optimizer=None, batch_size=10, epoches=100, lr=0.01, print_format='normal',
           loss_appendix=False, # if add para_cal to loss
           graph=True, 
           y_label=True, # if y is label or one-hot coding
@@ -189,17 +195,20 @@ def train_1(model, # nn.Modules derived manual ML model
           val=False,
           val_loader=None
           ):
-    total_loss = 0
-    avg_loss = []
-    total_loss_val = 0
-    avg_loss_val = []
+    total_loss = 0 # loss per epoch
+    avg_loss = [] # loss per batch
+    total_loss_val = 0 # loss per epoch
+    loss_val = [] # loss per idx
+    
     if criterion == None:
         criterion = nn.MSELoss()
     if optimizer == None:
         optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
     
     for epoch in range(epoches):
+        total_loss = 0
         for batch, (x_torch, y_torch) in enumerate(loader):
+            start = time.time()
             optimizer.zero_grad()
             # x_torch = torch.from_numpy(x).to(torch.float32).requires_grad_()
             
@@ -218,7 +227,8 @@ def train_1(model, # nn.Modules derived manual ML model
 
             total_loss += loss*x_torch.shape[0]
             avg_loss.append(loss)
-
+            elapsed = time.time() - start
+            
             if batch % 100 == 0:   
                 if print_format == 'time':
                     logging('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
@@ -232,9 +242,10 @@ def train_1(model, # nn.Modules derived manual ML model
                         loss, torch.exp(loss)))
                 
         if val:
+            total_loss_val = 0
             model.eval()
             with torch.no_grad():
-                avg_loss_val.append(0)
+                start_val = time.time()
                 for x_torch, y_torch in val_loader:
                 
                     pred = model(x_torch)
@@ -251,15 +262,16 @@ def train_1(model, # nn.Modules derived manual ML model
                     # optimizer.step()
 
                     total_loss_val += loss
-                    avg_loss_val[-1] += loss
+                    loss_val.append(loss)
                     
-                loss = avg_loss_val[-1] / len(val_loader)
+                loss = total_loss_val / len(val_loader)
                 # val 不按照batch计算
+                elapsed = time.time() - start_val
                 if print_format == 'time':
-                    logging('val: | epoch {:3d} | lr {:02.2f} | ms/batch {:5.2f} | '
+                    logging('val: | epoch {:3d} | lr {:02.2f} | ms/epoch {:5.2f} | '
                             'loss {:5.2f} | ppl {:8.2f}'.format(
                         epoch, optimizer.param_groups[0]['lr'],
-                        elapsed * 1000 / x.size(0), loss, torch.exp(loss)))
+                        elapsed * 1000, loss, torch.exp(loss)))
                 else:
                     logging('val: | epoch {:3d} | lr {:02.2f} | '
                             'loss {:5.2f} | ppl {:8.2f}'.format(
@@ -276,14 +288,14 @@ def train_1(model, # nn.Modules derived manual ML model
         my_plt(avg_loss, 'loss', name)
         my_plt(avg_loss, 'loss_mean', name, mean=True)
         if val:
-            my_plt(avg_loss_val, 'val_loss', name)
-            my_plt(avg_loss_val, 'val_loss_mean', name, mean=True)
+            my_plt(loss_val, 'val_loss', name)
+            my_plt(loss_val, 'val_loss_mean', name, mean=True)
         
     logging('\n' + str(summary(model)))
     logging('\n' + str(model))
     
     if val:
-        return (total_loss, avg_loss) , (total_loss_val, avg_loss_val)
+        return (total_loss, avg_loss) , (total_loss_val, loss_val)
     return total_loss, avg_loss
 
 import matplotlib.pyplot as plt
