@@ -52,8 +52,8 @@ def evaluate(model, data: torch.Tensor, batch_size=10, criterion=None,
             pred = model(x_torch)
             loss = criterion(pred, y_torch)
             
-            total_loss += loss*(x_torch.shape[0])
-            avg_loss.append(loss)
+            total_loss += loss.item() * (x_torch.shape[0])
+            avg_loss.append(loss.item())
     return total_loss.item() / data.shape[0], avg_loss
                    
 """not using Dataloader"""
@@ -147,8 +147,8 @@ def train(model, # nn.Modules derived manual ML model
                     # loss.backward()
                     # optimizer.step()
 
-                    total_loss_val += loss
-                    loss_val.append(loss)
+                    total_loss_val += loss.item()
+                    loss_val.append(loss.item())
                         
                 # 计算每一个epoch的平均val_loss
                 loss = total_loss_val / len(val_iter)
@@ -185,7 +185,7 @@ def train(model, # nn.Modules derived manual ML model
     return total_loss, avg_loss
 
 """using Dataloader"""
-def train_1(model, # nn.Modules derived manual ML model
+def dl_train(model, # nn.Modules derived manual ML model
           loader,
           criterion=None, optimizer=None, batch_size=10, epoches=100, lr=0.01, print_format='normal',
           loss_appendix=False, # if add para_cal to loss
@@ -193,7 +193,8 @@ def train_1(model, # nn.Modules derived manual ML model
           y_label=True, # if y is label or one-hot coding
           model_desp=False, # if has .inode / .onode / .hnode_stringformat attrs
           val=False,
-          val_loader=None
+          val_loader=None,
+          batch_skip=10 # how many batches show a loss
           ):
     total_loss = 0 # loss per epoch
     avg_loss = [] # loss per batch
