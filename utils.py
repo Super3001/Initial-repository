@@ -185,7 +185,7 @@ def train(model, # nn.Modules derived manual ML model
     return total_loss, avg_loss
 
 """using Dataloader"""
-def train_1(model, # nn.Modules derived manual ML model
+def dl_train(model, # nn.Modules derived manual ML model
           loader,
           criterion=None, optimizer=None, batch_size=10, epoches=100, lr=0.01, print_format='normal',
           loss_appendix=False, # if add para_cal to loss
