@@ -1,0 +1,69 @@
+{
+  "builder_name": "go_emotions",
+  "citation": "@inproceedings{demszky2020goemotions,\n author = {Demszky, Dorottya and Movshovitz-Attias, Dana and Ko, Jeongwoo and Cowen, Alan and Nemade, Gaurav and Ravi, Sujith},\n booktitle = {58th Annual Meeting of the Association for Computational Linguistics (ACL)},\n title = {{GoEmotions: A Dataset of Fine-Grained Emotions}},\n year = {2020}\n}\n",
+  "config_name": "raw",
+  "dataset_size": 55343102,
+  "description": "The GoEmotions dataset contains 58k carefully curated Reddit comments labeled for 27 emotion categories or Neutral.\nThe emotion categories are admiration, amusement, anger, annoyance, approval, caring, confusion, curiosity, desire,\ndisappointment, disapproval, disgust, embarrassment, excitement, fear, gratitude, grief, joy, love, nervousness,\noptimism, pride, realization, relief, remorse, sadness, surprise.\n",
+  "download_checksums": {
+    "https://storage.googleapis.com/gresearch/goemotions/data/full_dataset/goemotions_1.csv": {
+      "num_bytes": 14174600,
+      "checksum": null
+    },
+    "https://storage.googleapis.com/gresearch/goemotions/data/full_dataset/goemotions_2.csv": {
+      "num_bytes": 14173154,
+      "checksum": null
+    },
+    "https://storage.googleapis.com/gresearch/goemotions/data/full_dataset/goemotions_3.csv": {
+      "num_bytes": 14395164,
+      "checksum": null
+    }
+  },
+  "download_size": 42742918,
+  "features": {
+    "input_ids": {
+      "feature": {
+        "dtype": "int32",
+        "_type": "Value"
+      },
+      "_type": "Sequence"
+    },
+    "token_type_ids": {
+      "feature": {
+        "dtype": "int8",
+        "_type": "Value"
+      },
+      "_type": "Sequence"
+    },
+    "attention_mask": {
+      "feature": {
+        "dtype": "int8",
+        "_type": "Value"
+      },
+      "_type": "Sequence"
+    },
+    "labels": {
+      "feature": {
+        "dtype": "float32",
+        "_type": "Value"
+      },
+      "_type": "Sequence"
+    }
+  },
+  "homepage": "https://github.com/google-research/google-research/tree/master/goemotions",
+  "license": "",
+  "size_in_bytes": 98086020,
+  "splits": {
+    "train": {
+      "name": "train",
+      "num_bytes": 55343102,
+      "num_examples": 211225,
+      "dataset_name": "go_emotions"
+    }
+  },
+  "version": {
+    "version_str": "0.0.0",
+    "major": 0,
+    "minor": 0,
+    "patch": 0
+  }
+}
