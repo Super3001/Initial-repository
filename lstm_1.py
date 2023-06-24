@@ -111,7 +111,7 @@ if __name__ == '__main__':
     vocab_size = 30522
     # vocab_size = 1000
     hidden_dim = 80  # # mbed_dim
-    num_layers = 3  # [1, 10]
+    num_layers = 1  # [1, 10]
     dropout = 0.1  # [0.1, 0.2]
     num_classes = 28
     model = LSTM_1(input_dim=vocab_size,
@@ -120,7 +120,7 @@ if __name__ == '__main__':
                                num_classes=num_classes,
                                dropout=dropout)
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    optimizer = torch.optim.Adam(model.parameters())
     # lr [0.2, 0.05, 0.01, 0.001, 1e-4, 1e-5, 2e-4]
 
 

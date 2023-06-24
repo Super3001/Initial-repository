@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-flog = open('log.txt', 'w')
+flog = open('log.txt', 'a')
 
 def logging(s):
     flog.write(s + '\n')
@@ -79,8 +79,8 @@ train_dataset = MyDataset(ds['train'])
 # train_dataset = DummyDataset(dx, dy)
 
 # 使用DataLoader类生成可迭代的数据加载器
-batch_size = 128  # [1, 16, 128]
-train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+batch_size = 128  # [1, 16, 32 , 128]
+# train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True) # using kfolds later
 emotions = [
  'admiration',
  'amusement',
@@ -111,6 +111,10 @@ emotions = [
  'surprise',
  'neutral']
 
+from torch.utils.data import SubsetRandomSampler, Subset
+from sklearn.model_selection import KFold
+import numpy
+
 if __name__ == '__main__':
     device = "cuda:0" if torch.cuda.is_available() else 'cpu'
     print(device)
@@ -125,9 +129,7 @@ if __name__ == '__main__':
                                num_layers=num_layers,
                                num_classes=num_classes,
                                dropout=dropout)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    # lr [0.2, 0.05, 0.01, 0.001, 1e-4, 1e-5, 2e-4]
+
 
 
     # 参数初始化
@@ -146,7 +148,7 @@ if __name__ == '__main__':
 
 
     # model.apply(init_weights)
-    check_ori = torch.load('model_gru1_3.ckpt')
+    check_ori = torch.load('model_gru1_kfold_3.ckpt')
     model.load_state_dict(check_ori)
     print(model)
 
@@ -155,11 +157,12 @@ if __name__ == '__main__':
     def print_grad(grad):
         global cnt
         print(cnt, 'Gradient:', torch.max(grad), torch.min(grad))
+        print(torch.linalg.norm(grad))
         cnt += 1
 
 
     # 在网络的第一层全连接层上注册回调函数
-    # model.gru.weight_hh_l0.register_hook(print_grad)
+    model.gru.weight_hh_l0.register_hook(print_grad)
     # model.fc.weight.register_hook(print_grad)
 
     # print(model)
@@ -190,56 +193,105 @@ if __name__ == '__main__':
         print('Model has been converted to ONNX')
 
     # Convert_ONNX()
-
     # exit(0)
 
     import time
+    str_now = time.strftime('%Y%m%d %H %M',time.localtime())
+    
     # 训练模型
-    num_epochs = 10 
+    num_epochs = 1
     # thresh = 100
-    thresh = len(train_dataloader)
+    thresh = len(train_dataset)
+    # arr = numpy.arange(0, thresh) # for kfold.split()
+    arr = list(range(thresh))
+    K = 11
+    
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters()) # defualt: lr=1e-3
+    # lr [0.2, 0.05, 0.01, 0.001, 1e-4, 1e-5, 2e-4]
+    model = model.to(device)
     logging('')
-    logging(time.strftime('%Y%m%d %H:%M',time.localtime()))
+    logging(str_now)
     logging('training start...')
+    
+    floss = open(f'.\\loss\\loss {str_now}.txt','w')
+    floss.write('| kind | epoch | fold | iteration | loss |\n')
+    floss.write('|:--:|:--:|:--:|:--:|:--:|\n')
+    # floss.close()
+    
     for epoch in range(num_epochs):
         start = time.time()
-        loss_sum = 0
-        for i, (inputs, labels) in enumerate(train_dataloader):
-            if i >= thresh:
-                break
-            optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-            loss_sum += loss.item()
+        kfold = KFold(n_splits=K, shuffle=True)
+        for fold, (train_idx, val_idx) in enumerate(kfold.split(arr)):
+            train_idx, val_idx = train_idx.tolist(), val_idx.tolist()
+            print(type(train_idx[0]))
+            # print(f'Fold {fold+1}')
+            # train_sampler = SubsetRandomSampler(train_idx)
+            # val_sampler = SubsetRandomSampler(val_idx)
+            train_subset = Subset(train_dataset, train_idx)
+            val_subset = Subset(train_dataset, val_idx)
+            
+            train_loader = DataLoader(train_subset, batch_size=batch_size)
+            val_loader = DataLoader(train_subset, batch_size=batch_size)
 
-            if (i+1) % 20 == 0:
-                print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}, avgLoss: {:.4f}'
-                      .format(epoch+1, num_epochs, i+1, thresh,
-                              loss.item(), loss_sum / (i+1)))
+            loss_sum = 0
+            for i, (inputs, labels) in enumerate(train_loader):
+                model.train()
+                inputs, labels = inputs.to(device), labels.to(device)
+                optimizer.zero_grad()
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
+                loss_sum += loss.item()
 
-                # 打印模型参数
-                # for name, param in model.named_parameters():
-                #     print(name)
-                #     print(param.data)
-                # ls_param = list(model.named_parameters())
-                # print(ls_param[-2][0])
-                # print(ls_param[-2][1].data)
+                if (i+1) % 20 == 0:
+                    print('Epoch [{}/{}], Fold [{}/{}], Step [{}/{}], Loss: {:.4f}, avgLoss: {:.4f}'
+                        .format(epoch+1, num_epochs, fold, K, i+1, len(train_loader),
+                                loss.item(), loss_sum / (i+1)))
+                    floss.write(f'| train | {epoch} | {fold} | {i} | {loss_sum/(i+1)} | \n')
+
+                    # 打印模型参数
+                    # for name, param in model.named_parameters():
+                    #     print(name)
+                    #     print(param.data)
+                    # ls_param = list(model.named_parameters())
+                    # print(ls_param[-2][0])
+                    # print(ls_param[-2][1].data)
+                    
+            total_val_loss = 0
+            for j, (inputs, labels) in enumerate(val_loader):
+                model.eval()
+                inputs, labels = inputs.to(device), labels.to(device)
+                with torch.no_grad():
+                    pred = model(inputs)
+                    loss = criterion(pred, labels)
+                    total_val_loss += loss
+                    
+            print('Epoch [{}/{}], Fold [{}/{}],train_Loss: {:.4f}, val_Loss: {:.4f}'
+                        .format(epoch+1, num_epochs, fold, K, 
+                                loss_sum / len(train_loader), total_val_loss / len(val_loader)))
+            floss.write(f'| train | {epoch} | {fold} | --- | {loss_sum/len(train_loader)} | \n')
+            floss.write(f'| val | {epoch} | {fold} | --- | {total_val_loss/len(val_loader)} | \n')
+            
         end = time.time()
         logging(f'epoch{epoch}: using {end-start:.2f}s')
+        
+        
+        
     # 测试模型
+    examine_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=False)
+    
     corr = 0
-    for i, (inputs, labels) in enumerate(train_dataloader):
-        if i >= thresh:
-            break
+    for i, (inputs, labels) in enumerate(examine_dataloader):
         with torch.no_grad():
             outputs = model(inputs)
             if torch.argmax(outputs) == torch.argmax(labels):
                 corr += 1
-    print('accuracy:', corr / thresh)
+    logging(f'accuracy: {corr / len(examine_dataloader):.3f}')
 
     # 保存模型
-    torch.save(model.state_dict(), r'model_gru1_4.ckpt')
+    torch.save(model.state_dict(), r'model_gru1_kfold_5.ckpt')
+    floss.close()
     flog.close()
 

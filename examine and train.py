@@ -1,8 +1,8 @@
 import torch
 
-check_ori = torch.load('model_lstm1_2.ckpt')
+check_ori = torch.load('model_gru1_6.ckpt')
 
-from lstm_1 import LSTM_1, MyDataset
+from gru_1 import GRU_1, MyDataset
 
 device = "cuda:0" if torch.cuda.is_available() else 'cpu'
 print(device)
@@ -12,7 +12,7 @@ hidden_dim = 80  # # mbed_dim
 num_layers = 3  # [1, 10]
 dropout = 0.1  # [0.1, 0.2]
 num_classes = 28
-model = LSTM_1(input_dim=vocab_size,
+model = GRU_1(input_dim=vocab_size,
                            hidden_dim=hidden_dim,
                            num_layers=num_layers,
                            num_classes=num_classes,
@@ -33,7 +33,7 @@ from datasets import load_from_disk
 ds = load_from_disk('./dataset')
 train_dataset = MyDataset(ds['train'])
 batch_size = 1
-examine_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+examine_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
 
 print('begin')
 thresh = 10000
