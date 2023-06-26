@@ -1,0 +1,49 @@
+model train list:
+
+1. lstm_1.LSTM_1
+checkpoints:
+    1. model.ckpt 10 epoches datasets.go_emotions 'raw' all
+    2. model_lstm1_2 20 epoches datasets.go_emotions 'raw' all
+    3. model_lstm1_3 30 epoches datasets.go_emotions 'raw' all
+    4. model_lstm1_4 40 epoches datasets.go_emotions 'raw' all
+        eval acc(all) 0.0048
+    '''wrong build...
+        5. model_lstm1_5 50 epoches datasets.go_emotions 'raw' all
+            eval acc(all) 0.0066
+        6. model_lstm1_6 60 epoches datasets.go_emotions 'raw' all
+            eval acc(all) 0.0054
+        7. model_lstm1_7 70 epoches datasets.go_emotions 'raw' all
+            eval acc(all) 0.0066 loss(nn.CELoss) 2.0133
+            full train using 10375.80s
+        8. model_lstm1_7 70 epoches datasets.go_emotions 'raw' all
+            eval acc(all) 0.0030 loss(nn.CELoss) 2.0113
+            full train using 11615.51s
+    '''
+    model_lstm1_5 70 epoches datasets.go_emotions 'raw' all
+        eval acc(all) 0.0073 loss(nn.CELoss) 1.9376
+        full train using 29905s
+    
+    model_lstm1_6 80 epoches datasets.go_emotions 'raw' all
+        eval acc(all) 0.0432 loss(nn.CELoss) 1.9077
+        full train using 16296s
+    
+    model_lstm1_7 90 epoches datasets.go_emotions 'raw' all
+        eval acc(all) 0.0466 loss(nn.CELoss) 1.8
+        full train using 19789s
+
+    model_lstm1_8 100 epoches 
+
+    
+    
+
+
+2. gru_1.GRU_1 
+checkpoints:
+    1. model_gru1_1 1 epoch datasets.go_emotions 'raw' all
+    2. model_gru1_2 11 epoches datasets.go_emotions 'raw' all
+        eval acc(all) 0.0042
+    3. model_gru1_3 21 epoches datasets.go_emotions 'raw' all
+        eval acc(all) 0.00678
+    4. model_gru1_4 31 epoches datasets.go_emotions 'raw' all
+        eval acc(all) 0.0085 loss(nn.CELoss) 2.2067 
+    5. model_gru1_5

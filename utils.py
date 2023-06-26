@@ -3,7 +3,7 @@ import torch
 from torch import nn
 import numpy as np
 import time
-from torchsummary import summary
+# from torchsummary import summary
 import os
 
 def get_batch_data(x_data, y_data, batch_size) -> list:
@@ -52,8 +52,8 @@ def evaluate(model, data: torch.Tensor, batch_size=10, criterion=None,
             pred = model(x_torch)
             loss = criterion(pred, y_torch)
             
-            total_loss += loss.item() * (x_torch.shape[0])
-            avg_loss.append(loss.item())
+            total_loss += loss*(x_torch.shape[0])
+            avg_loss.append(loss)
     return total_loss.item() / data.shape[0], avg_loss
                    
 """not using Dataloader"""
@@ -147,8 +147,8 @@ def train(model, # nn.Modules derived manual ML model
                     # loss.backward()
                     # optimizer.step()
 
-                    total_loss_val += loss.item()
-                    loss_val.append(loss.item())
+                    total_loss_val += loss
+                    loss_val.append(loss)
                         
                 # 计算每一个epoch的平均val_loss
                 loss = total_loss_val / len(val_iter)
@@ -194,7 +194,8 @@ def dl_train(model, # nn.Modules derived manual ML model
           model_desp=False, # if has .inode / .onode / .hnode_stringformat attrs
           val=False,
           val_loader=None,
-          batch_skip=10 # how many batches show a loss
+          batch_skip=10, # how many batches show a loss
+          device = 'cpu'
           ):
     total_loss = 0 # loss per epoch
     avg_loss = [] # loss per batch
@@ -206,31 +207,49 @@ def dl_train(model, # nn.Modules derived manual ML model
     if optimizer == None:
         optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
     
+    # 避免显示太长
+    if epoches <= 100:
+        epoch_interval = 1
+    elif epoches <= 300:
+        epoch_interval = 5
+    elif epoches <= 500:
+        epoch_interval = 10
+    else:
+        epoch_interval = 20
+
+    model = model.to(device)
+
+    logging('\n')
+    logging(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
     for epoch in range(epoches):
         total_loss = 0
         for batch, (x_torch, y_torch) in enumerate(loader):
             start = time.time()
             optimizer.zero_grad()
             # x_torch = torch.from_numpy(x).to(torch.float32).requires_grad_()
-            
+            x_torch = x_torch.to(device)
+            # if batch == 0:
+            #     print(x_torch)
             pred = model(x_torch)
             # pred = torch.argmax(model(x_torch), dim=1)
+            # wrong
             if y_label:
-                y_torch_n = torch.zeros(pred.shape)
+                y_torch_n = torch.zeros(pred.shape, dtype=torch.float)
                 for i in range(y_torch_n.shape[0]):
                     y_torch_n[i][y_torch[i]] = 1
                 y_torch = y_torch_n
+            y_torch = y_torch.to(device)
             loss = criterion(pred, y_torch)
-            if loss_appendix:
+            if loss_appendix: # regularzation
                 pass
             loss.backward()
             optimizer.step()
 
-            total_loss += loss*x_torch.shape[0]
+            total_loss += loss.item()*x_torch.shape[0]
             avg_loss.append(loss)
             elapsed = time.time() - start
             
-            if batch % 100 == 0:   
+            if batch % 100 == 0 and epoch % epoch_interval == 0:   
                 if print_format == 'time':
                     logging('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
                             'loss {:5.2f} | ppl {:8.2f}'.format(
@@ -248,7 +267,7 @@ def dl_train(model, # nn.Modules derived manual ML model
             with torch.no_grad():
                 start_val = time.time()
                 for x_torch, y_torch in val_loader:
-                
+                    x_torch = x_torch.to(device)
                     pred = model(x_torch)
                     # pred = torch.argmax(model(x_torch), dim=1)
                     if y_label:
@@ -256,6 +275,7 @@ def dl_train(model, # nn.Modules derived manual ML model
                         for i in range(y_torch_n.shape[0]):
                             y_torch_n[i][y_torch[i]] = 1
                         y_torch = y_torch_n
+                    y_torch = y_torch.to(device)
                     loss = criterion(pred, y_torch)
                     if loss_appendix:
                         pass
@@ -292,7 +312,7 @@ def dl_train(model, # nn.Modules derived manual ML model
             my_plt(loss_val, 'val_loss', name)
             my_plt(loss_val, 'val_loss_mean', name, mean=True)
         
-    logging('\n' + str(summary(model)))
+    # logging('\n' + str(summary(model, loader.shape)))
     logging('\n' + str(model))
     
     if val:
@@ -322,6 +342,7 @@ def my_plt(ls: list, ylabel, name, line=True, mean=False):
     plt.ylabel(ylabel)
     plt.xlim(-1,)
     plt.title(name.upper())
+    plt.show()
     
 def line_plt(ls: list, ylabel, name):
     ls_sum = [0]
@@ -335,7 +356,7 @@ def line_plt(ls: list, ylabel, name):
     plt.ylabel(ylabel)
     plt.xlim(-1,)
     plt.title(name.upper())
-    
+    plt.show()
 
 def log_clear():
     with open(os.path.join(filepath, 'log.txt'), 'w') as f_log:
