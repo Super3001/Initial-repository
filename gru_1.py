@@ -148,7 +148,7 @@ if __name__ == '__main__':
 
 
     # model.apply(init_weights)
-    check_ori = torch.load('model_gru1_kfold_3.ckpt')
+    check_ori = torch.load('checkpoint\\model_gru1_kfold_3.ckpt')
     model.load_state_dict(check_ori)
     print(model)
 
@@ -192,8 +192,8 @@ if __name__ == '__main__':
         print(" ")
         print('Model has been converted to ONNX')
 
-    # Convert_ONNX()
-    # exit(0)
+    Convert_ONNX()
+    exit(0)
 
     import time
     str_now = time.strftime('%Y%m%d %H %M',time.localtime())

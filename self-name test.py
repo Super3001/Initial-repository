@@ -1,6 +1,6 @@
 import torch
 
-check_ori = torch.load('model_gru1_2.ckpt')
+check_ori = torch.load('.\\checkpoint\\model_gru1_6.ckpt')
 
 from gru_1 import GRU_1, MyDataset
 
@@ -34,6 +34,7 @@ def tokenize_function(s):
 test_input = tokenize_function(test_input)
 
 test_input = torch.tensor(test_input['input_ids'])
+print(test_input[0])
 
 test_output = model(test_input)
 
@@ -67,6 +68,8 @@ emotions = [
  'surprise',
  'neutral']
 
+print(test_output)
 for each in test_output:
     result = torch.softmax(each, dim=0)
-    print(f'most likely:{emotions[int(torch.argmax(result))]} at {float(torch.max(result)):.2f}')
+    print(result)
+    print(f'most likely:{emotions[int(torch.argmax(result))]} at {float(torch.max(result))}')

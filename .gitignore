@@ -1,3 +1,5 @@
 *.arrow
 *.xlsx
 *.ckpt
+*.png
+*.pyc
